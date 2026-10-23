@@ -1,0 +1,41 @@
+name: Monitor de Voos CNF-MAO
+
+on:
+  schedule:
+    - cron: '0 11,14,17,20,23,1 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  check_prices:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Baixar código do repositório
+        uses: actions/checkout@v4
+
+      - name: Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Instalar bibliotecas
+        run: pip install requests fast-flights
+
+      - name: Executar Monitoramento
+        env:
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          SERPAPI_KEY: ${{ secrets.SERPAPI_KEY }}
+          FORCE_REPORT: ${{ github.event_name == 'workflow_dispatch' && 'true' || 'false' }}
+        run: python monitor.py
+
+      - name: Salvar histórico de preços do dia (state.json)
+        run: |
+          if [ -f state.json ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git add state.json
+            git diff --staged --quiet || (git commit -m "Atualiza menores preços [skip ci]" && git push)
+          fi
